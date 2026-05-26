@@ -6,14 +6,10 @@ namespace App\Models;
 
 use App\Enums\Role;
 use Database\Factories\UserFactory;
-use App\Models\LeaveRequest;
-use Illuminate\Database\Eloquent\Attributes\Fillable;
-use Illuminate\Database\Eloquent\Attributes\Hidden;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 
-#[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
@@ -29,38 +25,46 @@ class User extends Authenticatable
         'email',
         'password',
         'role',
-        'annual_leave_days'
+        'annual_leave_days',
 
     ];
 
+    public function leaveRequests()
+    {
+        return $this->hasMany(LeaveRequest::class);
+    }
 
-  public function leaveRequests() {
-    return $this->hasMany(LeaveRequest::class);
-  }
+    public function isAdmin(): bool
+    {
+        return $this->role === Role::Admin;
+    }
 
-public function isAdmin(): bool
-{
-    return $this->role === Role::Admin;
-}
+    public function isEmployee(): bool
+    {
+        return $this->role !== Role::Admin;
+    }
 
+    public function remainingDays(): int
+    {
+        $usedDays = $this->leaveRequests()->approved()->get()
+            ->sum(fn ($r) => $r->durationInDays());
 
-public function isEmployee(): bool
-{
-    return $this->role !== Role::Admin;
-}
+        return $this->annual_leave_days - $usedDays;
 
- public function remainingDays() :int {
-$usedDays = $this->leaveRequests()->where('status', 'approved')->get()
-    ->sum(fn($r) => $r->durationInDays());
+    }
 
-return $this->annual_leave_days - $usedDays;
+    public function usedDays(): int
+    {
+        $usedDays = $this->leaveRequests()->approved()->get()->sum(fn ($r) => $r->durationInDays());
 
-   
- }
+        return $usedDays;
+    }
 
-  public function usedDays() :int {
-    return  $this->leaveRequests()->where('status', 'approved')->get()->sum(fn($r) => $r->durationInDays());
- }
+    public function usedDaysPercentage(): int
+    {
+        return $this->annual_leave_days > 0 ? round($this->usedDays() / $this->annual_leave_days * 100) : 0;
+
+    }
 
     protected function casts(): array
     {
@@ -71,4 +75,3 @@ return $this->annual_leave_days - $usedDays;
         ];
     }
 }
-    
